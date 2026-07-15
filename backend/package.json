@@ -1,0 +1,49 @@
+{
+  "name": "restaurant-ops-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Restaurant Operations Platform",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "npx prisma generate",
+    "prisma:migrate": "npx prisma migrate dev",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:seed-platform": "ts-node prisma/seed-platform.ts",
+    "prisma:seed-tenants": "ts-node prisma/seed-tenants.ts",
+    "prisma:backfill-slugs": "ts-node prisma/backfill-slugs.ts",
+    "prisma:seed-ops": "ts-node prisma/seed-ops.ts",
+    "prisma:sync-rbac": "ts-node prisma/sync-rbac.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^5.16.1",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.79.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.2",
+    "redis": "^6.1.0",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.9",
+    "prisma": "^5.16.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.2"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  }
+}
