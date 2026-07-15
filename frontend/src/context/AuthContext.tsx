@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
 
+export interface SubscriptionEntitlements {
+  planTier: string | null;
+  status: string | null;
+  maxBranches: number | null;
+  maxEmployees: number | null;
+  features: string[];
+  currentPeriodEnd: string | null;
+  isActive?: boolean;
+  isExpired?: boolean;
+}
+
 interface User {
   id: string;
   email: string;
@@ -8,6 +19,7 @@ interface User {
   role: string;
   branchId: string | null;
   tenantId?: string | null;
+  subscription?: SubscriptionEntitlements;
 }
 
 interface AuthContextType {
@@ -15,9 +27,11 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  planFeatures: string[];
   login: (credentials: any) => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => void;
+  hasFeature: (featureKey: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,7 +70,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('tastyc_tenant_id', data.user.tenantId);
       }
       setToken(data.token);
-      setUser(data.user);
+      // Refresh full profile (includes subscription entitlements)
+      try {
+        const me = await api.auth.getMe();
+        setUser(me);
+      } catch {
+        setUser(data.user);
+      }
     } catch (error) {
       setIsLoading(false);
       throw error;
@@ -85,6 +105,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const planFeatures = user?.subscription?.features || [];
+  const hasFeature = (featureKey: string) => {
+    if (user?.role === 'SUPER_ADMIN') return true;
+    if (user?.subscription?.isExpired) return false;
+    return planFeatures.includes(featureKey);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -92,9 +119,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         isAuthenticated: !!user,
         isLoading,
+        planFeatures,
         login,
         register,
         logout,
+        hasFeature,
       }}
     >
       {children}

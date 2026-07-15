@@ -17,7 +17,7 @@ interface Branch {
 }
 
 export const FranchiseManagement: React.FC = () => {
-  const { showNotification } = useNotification();
+  const { showNotification, showConfirm } = useNotification();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -118,22 +118,24 @@ export const FranchiseManagement: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await api.branches.delete(id);
-      showNotification({
-        title: 'Branch Deleted',
-        message: 'Location removed successfully.',
-        type: 'success'
-      });
-      fetchBranches();
-    } catch (error) {
-      showNotification({
-        title: 'Action Failed',
-        message: 'Could not remove branch.',
-        type: 'error'
-      });
-    }
+  const handleDelete = (id: string) => {
+    showConfirm('Delete this branch location? This cannot be easily undone.', async () => {
+      try {
+        await api.branches.delete(id);
+        showNotification({
+          title: 'Branch Deleted',
+          message: 'Location removed successfully.',
+          type: 'success'
+        });
+        fetchBranches();
+      } catch (error) {
+        showNotification({
+          title: 'Action Failed',
+          message: 'Could not remove branch.',
+          type: 'error'
+        });
+      }
+    }, 'Delete branch');
   };
 
   return (

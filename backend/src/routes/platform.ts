@@ -3,6 +3,7 @@ import { authenticateJWT, requireRoles } from '../middleware/auth';
 import {
   listTenants,
   createTenant,
+  assignTenantPlan,
   updateTenantStatus,
   softDeleteTenant,
   getTenantStorefrontSettings,
@@ -51,6 +52,7 @@ router.post('/branding/upload', uploadPlatformBrandingAsset);
 router.get('/tenants', listTenants);
 router.post('/tenants', createTenant);
 router.patch('/tenants/:id/status', updateTenantStatus);
+router.patch('/tenants/:id/plan', assignTenantPlan);
 router.delete('/tenants/:id', softDeleteTenant);
 router.get('/tenants/:id/settings', getTenantStorefrontSettings);
 router.put('/tenants/:id/settings', updateTenantStorefrontSettings);

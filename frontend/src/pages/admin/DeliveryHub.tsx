@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { ResourceModule } from '../../components/ResourceModule';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 
 export const DeliveryHub: React.FC = () => {
   const { user } = useAuth();
+  const { showConfirm } = useNotification();
   const [staff, setStaff] = useState<any[]>([]);
 
   useEffect(() => {
@@ -67,9 +69,11 @@ export const DeliveryHub: React.FC = () => {
             <button
               key={status}
               className="text-tastyc-copper hover:underline"
-              onClick={async () => {
-                await api.ops.delivery.setStatus(row.id, { status });
-                reload();
+              onClick={() => {
+                showConfirm(`Set delivery job to ${status.replace('_', ' ')}?`, async () => {
+                  await api.ops.delivery.setStatus(row.id, { status });
+                  reload();
+                }, 'Update delivery');
               }}
             >
               {status.replace('_', ' ')}

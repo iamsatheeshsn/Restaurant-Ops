@@ -55,7 +55,7 @@ import { RestaurantDirectory } from './pages/customer/RestaurantDirectory';
 import { StorefrontShell } from './components/StorefrontShell';
 import { useOptionalStorefront } from './context/TenantContext';
 
-import { ADMIN_ROUTE_ROLES } from './config/rbac';
+import { ADMIN_ROUTE_ROLES, canAccessAdminRoute } from './config/rbac';
 
 // Lucide Icons
 import { X, Trash2, ArrowRight } from 'lucide-react';
@@ -68,7 +68,9 @@ interface ProtectedRouteProps {
 // Protected Route Component for Admin Dashboard with Granular RBAC Checks
 const ProtectedAdminRoute: React.FC<ProtectedRouteProps> = ({ children, path }) => {
   const { isAuthenticated, user, isLoading } = useAuth();
-  const allowedRoles = ADMIN_ROUTE_ROLES[path] || [];
+  const features = user?.subscription?.features || null;
+  const roleAllowed = (ADMIN_ROUTE_ROLES[path] || []).includes(user?.role as any);
+  const featureAllowed = canAccessAdminRoute(user?.role, path, features);
 
   if (isLoading) {
     return (
@@ -82,16 +84,64 @@ const ProtectedAdminRoute: React.FC<ProtectedRouteProps> = ({ children, path }) 
     return <Navigate to="/admin/login" replace />;
   }
 
-  if (!allowedRoles.includes(user.role as any)) {
+  const planExpired =
+    user.role !== 'SUPER_ADMIN' &&
+    !!user.tenantId &&
+    (user.subscription?.isExpired === true || user.subscription?.status === 'EXPIRED');
+
+  if (planExpired) {
+    return (
+      <AdminLayout>
+        <div className="text-center py-20 max-w-md mx-auto space-y-4">
+          <div className="h-16 w-16 bg-amber-950/20 border border-amber-500/25 rounded-full flex items-center justify-center mx-auto text-amber-400">
+            <X className="h-8 w-8" />
+          </div>
+          <h2 className="font-title text-2xl uppercase tracking-wider text-white">Subscription Expired</h2>
+          <p className="text-xs text-[#a9b8c3] leading-relaxed">
+            Your restaurant plan
+            {user.subscription?.planTier ? (
+              <>
+                {' '}
+                (<span className="text-tastyc-copper font-bold">{user.subscription.planTier}</span>)
+              </>
+            ) : null}{' '}
+            is no longer active. Renew the plan with the platform owner to restore access. You cannot use admin
+            actions until the subscription is renewed.
+          </p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!roleAllowed || !featureAllowed) {
+    const planBlocked = roleAllowed && !featureAllowed;
     return (
       <AdminLayout>
         <div className="text-center py-20 max-w-md mx-auto space-y-4">
           <div className="h-16 w-16 bg-red-950/20 border border-red-500/25 rounded-full flex items-center justify-center mx-auto text-red-500">
             <X className="h-8 w-8" />
           </div>
-          <h2 className="font-title text-2xl uppercase tracking-wider text-white">Access Denied</h2>
+          <h2 className="font-title text-2xl uppercase tracking-wider text-white">
+            {planBlocked ? 'Plan Upgrade Required' : 'Access Denied'}
+          </h2>
           <p className="text-xs text-[#a9b8c3] leading-relaxed">
-            Your staff account role <span className="text-tastyc-copper font-bold">({user.role})</span> does not hold administrative clearance to view this module.
+            {planBlocked ? (
+              <>
+                This module is not included in your current subscription
+                {user.subscription?.planTier ? (
+                  <>
+                    {' '}
+                    (<span className="text-tastyc-copper font-bold">{user.subscription.planTier}</span>)
+                  </>
+                ) : null}
+                . Contact the platform owner to upgrade.
+              </>
+            ) : (
+              <>
+                Your staff account role <span className="text-tastyc-copper font-bold">({user.role})</span> does not
+                hold administrative clearance to view this module.
+              </>
+            )}
           </p>
         </div>
       </AdminLayout>

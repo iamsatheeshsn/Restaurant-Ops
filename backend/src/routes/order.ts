@@ -7,7 +7,7 @@ import {
   getTables
 } from '../controllers/order';
 import { validateOrder } from '../validators/order';
-import { authenticateJWT, requirePermission, requireAnyPermission, resolveTenant } from '../middleware/auth';
+import { authenticateJWT, requireActiveSubscription, requirePermission, requireAnyPermission, resolveTenant, requireFeature } from '../middleware/auth';
 
 const router = Router();
 
@@ -16,8 +16,8 @@ router.get('/tables', resolveTenant, getTables);
 
 // KDS Orders routing
 router.post('/', resolveTenant, validateOrder, createOrder);
-router.get('/', authenticateJWT, requireAnyPermission('orders:kds', 'orders:checkout'), getOrders);
+router.get('/', authenticateJWT, requireActiveSubscription, requireAnyPermission('orders:kds', 'orders:checkout'), requireFeature('kds'), getOrders);
 router.get('/:id', resolveTenant, getOrderById);
-router.put('/:id/status', authenticateJWT, requireAnyPermission('orders:kds', 'orders:checkout'), updateOrderStatus);
+router.put('/:id/status', authenticateJWT, requireActiveSubscription, requireAnyPermission('orders:kds', 'orders:checkout'), requireFeature('kds'), updateOrderStatus);
 
 export default router;

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { ResourceModule } from '../../components/ResourceModule';
+import { useNotification } from '../../context/NotificationContext';
 
 export const StaffScheduling: React.FC = () => {
+  const { showConfirm } = useNotification();
   const [users, setUsers] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
 
@@ -52,9 +54,11 @@ export const StaffScheduling: React.FC = () => {
       rowActions={(row, reload) => (
         <button
           className="text-red-400 hover:underline"
-          onClick={async () => {
-            await api.ops.schedules.remove(row.id);
-            reload();
+          onClick={() => {
+            showConfirm('Remove this shift schedule?', async () => {
+              await api.ops.schedules.remove(row.id);
+              reload();
+            }, 'Remove schedule');
           }}
         >
           Remove

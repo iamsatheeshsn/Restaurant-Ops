@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/error';
 import { parsePagination, paginatedResponse } from '../utils/pagination';
 import * as bcrypt from 'bcryptjs';
+import { assertEmployeeLimit } from '../services/subscription';
 
 // --- Floors ---
 
@@ -270,6 +271,11 @@ export const createUser = async (req: AuthRequest, res: Response, next: NextFunc
       if (role.name === 'SUPER_ADMIN') {
         return next(new AppError('Cannot assign platform SUPER_ADMIN via restaurant staff', 403, 'ACTION_FORBIDDEN'));
       }
+      if (role.name !== 'CUSTOMER') {
+        await assertEmployeeLimit(tenantId);
+      }
+    } else {
+      await assertEmployeeLimit(tenantId);
     }
 
     const hashedPassword = await bcrypt.hash(password || 'password123', 10);

@@ -10,6 +10,7 @@ import { prisma } from '../config/db';
 import { env } from '../config/env';
 import { AppError } from './error';
 import { logger } from '../config/logger';
+import { assertFeatureEnabled, assertTenantAccessAllowed } from '../services/subscription';
 
 export interface AuthRequest extends Request {
   user?: TokenPayload;
@@ -185,6 +186,63 @@ export const requireAnyPermission = (...requiredScopes: string[]) => {
       if (error instanceof AppError) return next(error);
       logger.error(`RBAC error: ${error.message}`);
       return next(new AppError('Security verification failed', 500, 'INTERNAL_SERVER_ERROR'));
+    }
+  };
+};
+
+/**
+ * Block restaurant-tenant users when subscription is missing/expired or tenant is suspended.
+ * SUPER_ADMIN bypasses (platform operator).
+ */
+export const requireActiveSubscription = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return next(new AppError('Authentication context required', 401, 'UNAUTHORIZED'));
+    }
+    if (req.user.role === 'SUPER_ADMIN') {
+      return next();
+    }
+    const tenantId = req.tenantId || req.user.tenantId;
+    if (!tenantId) {
+      return next(new AppError('Tenant context required', 400, 'TENANT_CONTEXT_MISSING'));
+    }
+    await assertTenantAccessAllowed(tenantId);
+    return next();
+  } catch (error: any) {
+    if (error instanceof AppError) return next(error);
+    logger.error(`Subscription gate error: ${error.message}`);
+    return next(new AppError('Subscription verification failed', 500, 'INTERNAL_SERVER_ERROR'));
+  }
+};
+
+/**
+ * Enforce SaaS plan feature flags for restaurant tenants.
+ * SUPER_ADMIN bypasses (platform operator). Requires tenant context on the request.
+ */
+export const requireFeature = (...featureKeys: string[]) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (req.user?.role === 'SUPER_ADMIN') {
+        return next();
+      }
+
+      const tenantId = req.tenantId || req.user?.tenantId;
+      if (!tenantId) {
+        return next(new AppError('Tenant context required for plan features', 400, 'TENANT_CONTEXT_MISSING'));
+      }
+
+      if (featureKeys.length === 0) {
+        return next(new AppError('Feature key not configured', 500, 'INTERNAL_SERVER_ERROR'));
+      }
+
+      for (const key of featureKeys) {
+        await assertFeatureEnabled(tenantId, key);
+      }
+      return next();
+    } catch (error: any) {
+      if (error instanceof AppError) return next(error);
+      logger.error(`Feature gate error: ${error.message}`);
+      return next(new AppError('Feature verification failed', 500, 'INTERNAL_SERVER_ERROR'));
     }
   };
 };

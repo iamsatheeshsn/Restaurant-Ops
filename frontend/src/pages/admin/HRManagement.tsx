@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { ResourceModule } from '../../components/ResourceModule';
+import { useNotification } from '../../context/NotificationContext';
 
 export const HRManagement: React.FC = () => {
+  const { showConfirm } = useNotification();
   const [tab, setTab] = useState<'leaves' | 'payroll'>('leaves');
   const [users, setUsers] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
@@ -82,18 +84,22 @@ export const HRManagement: React.FC = () => {
               <div className="flex gap-2">
                 <button
                   className="text-emerald-400 hover:underline"
-                  onClick={async () => {
-                    await api.ops.leaves.setStatus(row.id, 'APPROVED');
-                    reload();
+                  onClick={() => {
+                    showConfirm('Approve this leave request?', async () => {
+                      await api.ops.leaves.setStatus(row.id, 'APPROVED');
+                      reload();
+                    }, 'Approve leave');
                   }}
                 >
                   Approve
                 </button>
                 <button
                   className="text-red-400 hover:underline"
-                  onClick={async () => {
-                    await api.ops.leaves.setStatus(row.id, 'REJECTED');
-                    reload();
+                  onClick={() => {
+                    showConfirm('Reject this leave request?', async () => {
+                      await api.ops.leaves.setStatus(row.id, 'REJECTED');
+                      reload();
+                    }, 'Reject leave');
                   }}
                 >
                   Reject

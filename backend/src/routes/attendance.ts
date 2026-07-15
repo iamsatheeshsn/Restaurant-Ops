@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { clockIn, clockOut, getClockStatus, getAttendanceLogs, createManualAttendance } from '../controllers/attendance';
-import { authenticateJWT, requirePermission } from '../middleware/auth';
+import { authenticateJWT, requireActiveSubscription, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/clock-in', authenticateJWT, requirePermission('attendance:clock'), clockIn);
-router.post('/clock-out', authenticateJWT, requirePermission('attendance:clock'), clockOut);
+router.post('/clock-in', authenticateJWT, requireActiveSubscription, requirePermission('attendance:clock'), clockIn);
+router.post('/clock-out', authenticateJWT, requireActiveSubscription, requirePermission('attendance:clock'), clockOut);
 // Status readable by any authenticated staff (UI clock widget); mutations still require attendance:clock
-router.get('/status', authenticateJWT, getClockStatus);
-router.post('/manual', authenticateJWT, requirePermission('attendance:read'), createManualAttendance);
-router.get('/', authenticateJWT, requirePermission('attendance:read'), getAttendanceLogs);
+router.get('/status', authenticateJWT, requireActiveSubscription, getClockStatus);
+router.post('/manual', authenticateJWT, requireActiveSubscription, requirePermission('attendance:read'), createManualAttendance);
+router.get('/', authenticateJWT, requireActiveSubscription, requirePermission('attendance:read'), getAttendanceLogs);
 
 export default router;

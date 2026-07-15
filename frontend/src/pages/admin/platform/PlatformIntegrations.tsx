@@ -5,7 +5,7 @@ import { useNotification } from '../../../context/NotificationContext';
 
 export const PlatformIntegrations: React.FC = () => {
   const [tab, setTab] = useState<'integrations' | 'keys' | 'tax'>('integrations');
-  const { showNotification } = useNotification();
+  const { showNotification, showConfirm } = useNotification();
   const [plainKey, setPlainKey] = useState<string | null>(null);
 
   return (
@@ -94,9 +94,11 @@ export const PlatformIntegrations: React.FC = () => {
               !row.revokedAt ? (
                 <button
                   className="text-red-400 hover:underline"
-                  onClick={async () => {
-                    await api.platform.apiKeys.revoke(row.id);
-                    reload();
+                  onClick={() => {
+                    showConfirm(`Revoke API key "${row.name || row.id}"? This cannot be undone.`, async () => {
+                      await api.platform.apiKeys.revoke(row.id);
+                      reload();
+                    }, 'Revoke key');
                   }}
                 >
                   Revoke
@@ -130,9 +132,11 @@ export const PlatformIntegrations: React.FC = () => {
           rowActions={(row, reload) => (
             <button
               className="text-red-400 hover:underline"
-              onClick={async () => {
-                await api.platform.tax.remove(row.id);
-                reload();
+              onClick={() => {
+                showConfirm(`Delete tax setting ${row.taxName || row.country}?`, async () => {
+                  await api.platform.tax.remove(row.id);
+                  reload();
+                });
               }}
             >
               Delete

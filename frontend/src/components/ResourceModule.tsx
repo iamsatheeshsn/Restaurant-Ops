@@ -234,7 +234,11 @@ export const ResourceModule: React.FC<Props> = ({
                       {c.render ? c.render(row) : cellValue(row, c.key)}
                     </td>
                   ))}
-                  {rowActions && <td className="px-4 py-3 text-xs">{rowActions(row, () => reload())}</td>}
+                  {rowActions && (
+                    <td className="px-4 py-3 text-xs whitespace-nowrap min-w-[12rem]">
+                      {rowActions(row, () => reload())}
+                    </td>
+                  )}
                 </tr>
               ))
             )}

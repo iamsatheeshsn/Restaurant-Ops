@@ -7,7 +7,7 @@ export const PlatformSystem: React.FC = () => {
   const [tab, setTab] = useState<'health' | 'analytics' | 'backups' | 'announcements'>('health');
   const [health, setHealth] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
-  const { showNotification } = useNotification();
+  const { showNotification, showConfirm } = useNotification();
 
   useEffect(() => {
     if (tab === 'health') {
@@ -167,9 +167,11 @@ export const PlatformSystem: React.FC = () => {
           rowActions={(row, reload) => (
             <button
               className="text-red-400 hover:underline"
-              onClick={async () => {
-                await api.platform.announcements.remove(row.id);
-                reload();
+              onClick={() => {
+                showConfirm(`Delete announcement "${row.title || row.id}"?`, async () => {
+                  await api.platform.announcements.remove(row.id);
+                  reload();
+                });
               }}
             >
               Delete

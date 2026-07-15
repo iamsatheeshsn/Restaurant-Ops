@@ -6,7 +6,7 @@ import { StorefrontSettingsForm } from '../../../components/StorefrontSettingsFo
 import { PaginationControls } from '../../../components/PaginationControls';
 
 export const TenantsManagement: React.FC = () => {
-  const { showNotification } = useNotification();
+  const { showNotification, showConfirm } = useNotification();
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -21,8 +21,10 @@ export const TenantsManagement: React.FC = () => {
     status: 'TRIAL',
     currency: 'USD',
     timezone: 'UTC',
+    planTier: 'STARTER',
   });
   const [editingTenant, setEditingTenant] = useState<any | null>(null);
+  const [plans, setPlans] = useState<any[]>([]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -41,6 +43,13 @@ export const TenantsManagement: React.FC = () => {
     reload();
   }, [reload]);
 
+  useEffect(() => {
+    api.platform.plans
+      .list({ limit: 50 })
+      .then((r) => setPlans((r.data || []).filter((p: any) => p.isActive !== false)))
+      .catch(() => setPlans([]));
+  }, []);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
@@ -52,10 +61,19 @@ export const TenantsManagement: React.FC = () => {
         status: form.status,
         currency: form.currency,
         timezone: form.timezone,
+        planTier: form.planTier,
       });
-      showNotification({ title: 'Created', message: `${created.name} is ready`, type: 'success' });
+      showNotification({ title: 'Created', message: `${created.name} is ready on ${form.planTier}`, type: 'success' });
       setShowCreate(false);
-      setForm({ name: '', companyName: '', slug: '', status: 'TRIAL', currency: 'USD', timezone: 'UTC' });
+      setForm({
+        name: '',
+        companyName: '',
+        slug: '',
+        status: 'TRIAL',
+        currency: 'USD',
+        timezone: 'UTC',
+        planTier: 'STARTER',
+      });
       setPage(1);
       await reload();
       setEditingTenant(created);
@@ -64,6 +82,21 @@ export const TenantsManagement: React.FC = () => {
     } finally {
       setCreating(false);
     }
+  };
+
+  const changePlan = (tenant: any, planTier: string) => {
+    const current = tenant.subscriptions?.[0]?.planTier || 'none';
+    if (current === planTier) return;
+    showConfirm(`Change plan for ${tenant.name} from ${current} to ${planTier}?`, async () => {
+      try {
+        await api.platform.tenants.assignPlan(tenant.id, { planTier });
+        showNotification({ title: 'Plan updated', message: `${tenant.name} → ${planTier}`, type: 'success' });
+        await reload();
+      } catch (err: any) {
+        showNotification({ title: 'Plan change failed', message: err.message, type: 'error' });
+        await reload();
+      }
+    }, 'Change plan');
   };
 
   if (editingTenant) {
@@ -192,6 +225,31 @@ export const TenantsManagement: React.FC = () => {
                 ))}
               </select>
             </label>
+            <label className="space-y-1.5 text-left sm:col-span-2">
+              <span className="text-[10px] uppercase tracking-wider text-[#a9b8c3] font-semibold">
+                Subscription plan
+              </span>
+              <select
+                required
+                value={form.planTier}
+                onChange={(e) => setForm({ ...form, planTier: e.target.value })}
+                className="w-full bg-tastyc-dark border border-tastyc-copper/20 p-2.5 text-sm text-white outline-none focus:border-tastyc-copper"
+              >
+                {(plans.length
+                  ? plans
+                  : [
+                      { tier: 'STARTER', name: 'Starter', maxBranches: 1, maxEmployees: 10, priceMonthly: 49 },
+                      { tier: 'GROWTH', name: 'Growth', maxBranches: 5, maxEmployees: 50, priceMonthly: 129 },
+                      { tier: 'ENTERPRISE', name: 'Enterprise', maxBranches: 100, maxEmployees: 500, priceMonthly: 349 },
+                    ]
+                ).map((p: any) => (
+                  <option key={p.tier || p.id} value={p.tier}>
+                    {p.name} ({p.tier}) — {p.maxBranches} branches / {p.maxEmployees} staff
+                    {p.priceMonthly != null ? ` · $${p.priceMonthly}/mo` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 text-xs uppercase text-[#a9b8c3]">
@@ -214,6 +272,7 @@ export const TenantsManagement: React.FC = () => {
             <tr className="border-b border-tastyc-copper/10 text-[10px] uppercase tracking-widest text-[#a9b8c3]">
               <th className="px-4 py-3 font-semibold">Restaurant</th>
               <th className="px-4 py-3 font-semibold">Storefront</th>
+              <th className="px-4 py-3 font-semibold">Plan</th>
               <th className="px-4 py-3 font-semibold">Currency</th>
               <th className="px-4 py-3 font-semibold">Timezone</th>
               <th className="px-4 py-3 font-semibold">Status</th>
@@ -223,13 +282,13 @@ export const TenantsManagement: React.FC = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-xs text-[#a9b8c3]">
+                <td colSpan={7} className="px-4 py-10 text-center text-xs text-[#a9b8c3]">
                   Loading…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-xs text-[#a9b8c3]">
+                <td colSpan={7} className="px-4 py-10 text-center text-xs text-[#a9b8c3]">
                   No tenants yet.
                 </td>
               </tr>
@@ -239,6 +298,25 @@ export const TenantsManagement: React.FC = () => {
                   <td className="px-4 py-3 text-xs text-white font-semibold">{row.name}</td>
                   <td className="px-4 py-3 text-xs text-tastyc-copper font-mono">
                     {row.slug ? `/r/${row.slug}` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    <select
+                      className="bg-tastyc-dark border border-tastyc-copper/20 px-2 py-1 text-[10px] uppercase tracking-wider text-white outline-none focus:border-tastyc-copper"
+                      value={row.subscriptions?.[0]?.planTier || ''}
+                      onChange={(e) => {
+                        if (e.target.value) changePlan(row, e.target.value);
+                      }}
+                    >
+                      {!row.subscriptions?.[0]?.planTier && <option value="">No plan</option>}
+                      {['STARTER', 'GROWTH', 'ENTERPRISE'].map((tier) => (
+                        <option key={tier} value={tier}>
+                          {tier}
+                          {row.subscriptions?.[0]?.planTier === tier
+                            ? ` · ${row.subscriptions[0].maxBranches}b / ${row.subscriptions[0].maxEmployees}e`
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-3 text-xs text-[#a9b8c3]">{row.settings?.currency || 'USD'}</td>
                   <td className="px-4 py-3 text-xs text-[#a9b8c3]">{row.settings?.timezone || 'UTC'}</td>
@@ -271,10 +349,12 @@ export const TenantsManagement: React.FC = () => {
                       {row.status !== 'ACTIVE' && (
                         <button
                           className="text-emerald-400 hover:underline"
-                          onClick={async () => {
-                            await api.platform.tenants.setStatus(row.id, 'ACTIVE');
-                            showNotification({ title: 'Activated', message: `${row.name} is active`, type: 'success' });
-                            reload();
+                          onClick={() => {
+                            showConfirm(`Activate tenant ${row.name}?`, async () => {
+                              await api.platform.tenants.setStatus(row.id, 'ACTIVE');
+                              showNotification({ title: 'Activated', message: `${row.name} is active`, type: 'success' });
+                              reload();
+                            }, 'Activate tenant');
                           }}
                         >
                           Activate
@@ -283,10 +363,12 @@ export const TenantsManagement: React.FC = () => {
                       {row.status !== 'SUSPENDED' && (
                         <button
                           className="text-amber-400 hover:underline"
-                          onClick={async () => {
-                            await api.platform.tenants.setStatus(row.id, 'SUSPENDED');
-                            showNotification({ title: 'Suspended', message: `${row.name} suspended`, type: 'info' });
-                            reload();
+                          onClick={() => {
+                            showConfirm(`Suspend tenant ${row.name}? Restaurant users will lose access.`, async () => {
+                              await api.platform.tenants.setStatus(row.id, 'SUSPENDED');
+                              showNotification({ title: 'Suspended', message: `${row.name} suspended`, type: 'info' });
+                              reload();
+                            }, 'Suspend tenant');
                           }}
                         >
                           Suspend

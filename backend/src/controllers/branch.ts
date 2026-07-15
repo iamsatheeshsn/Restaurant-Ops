@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { prisma } from '../config/db';
 import { AuthRequest } from '../middleware/auth';
 import { parsePagination, paginatedResponse } from '../utils/pagination';
+import { assertBranchLimit } from '../services/subscription';
 
 export const getBranches = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -29,6 +30,8 @@ export const createBranch = async (req: AuthRequest, res: Response, next: NextFu
   const { name, address, phone, email, currency, country, isCentralKitchen, isWarehouse } = req.body;
   const tenantId = req.tenantId!;
   try {
+    await assertBranchLimit(tenantId);
+
     const branch = await prisma.branch.create({
       data: {
         tenantId,

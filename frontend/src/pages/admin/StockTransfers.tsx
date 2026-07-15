@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { ResourceModule } from '../../components/ResourceModule';
+import { useNotification } from '../../context/NotificationContext';
 
 export const StockTransfers: React.FC = () => {
+  const { showConfirm } = useNotification();
   const [branches, setBranches] = useState<any[]>([]);
   const [ingredients, setIngredients] = useState<any[]>([]);
 
@@ -66,9 +68,11 @@ export const StockTransfers: React.FC = () => {
             <button
               key={status}
               className="text-tastyc-copper hover:underline"
-              onClick={async () => {
-                await api.ops.transfers.setStatus(row.id, status);
-                reload();
+              onClick={() => {
+                showConfirm(`Set transfer status to ${status.replace('_', ' ')}?`, async () => {
+                  await api.ops.transfers.setStatus(row.id, status);
+                  reload();
+                }, 'Update transfer');
               }}
             >
               {status.replace('_', ' ')}

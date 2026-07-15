@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, TokenPayload } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/error';
+import { assertTenantAccessAllowed, getTenantEntitlements } from '../services/subscription';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -129,6 +130,11 @@ export const login = async (req: AuthRequest, res: Response, next: NextFunction)
       return next(new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS'));
     }
 
+    // Restaurant users require an active (non-expired) subscription plan.
+    if (user.tenantId && user.role.name !== 'SUPER_ADMIN') {
+      await assertTenantAccessAllowed(user.tenantId);
+    }
+
     const tokenPayload: TokenPayload = {
       id: user.id,
       email: user.email,
@@ -215,6 +221,18 @@ export const getMe = async (req: AuthRequest, res: Response, next: NextFunction)
       return next(new AppError('User profile not found', 404, 'RESOURCE_NOT_FOUND'));
     }
 
+    const entitlements = await getTenantEntitlements(user.tenantId);
+
+    if (user.tenantId && user.role.name !== 'SUPER_ADMIN' && entitlements.isExpired) {
+      return next(
+        new AppError(
+          'Your restaurant subscription plan has expired. Renew the plan to continue using the application.',
+          402,
+          'SUBSCRIPTION_EXPIRED'
+        )
+      );
+    }
+
     return res.json({
       success: true,
       data: {
@@ -224,6 +242,7 @@ export const getMe = async (req: AuthRequest, res: Response, next: NextFunction)
         role: user.role.name,
         tenantId: user.tenantId,
         branchId: user.branchId,
+        subscription: entitlements,
       }
     });
   } catch (error) {

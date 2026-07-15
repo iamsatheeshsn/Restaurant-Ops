@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { getSettings, updateSettings } from '../controllers/settings';
-import { authenticateJWT, requirePermission, resolveTenant, AuthRequest } from '../middleware/auth';
+import { authenticateJWT, requireActiveSubscription, requirePermission, resolveTenant, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -33,6 +33,6 @@ router.get('/', (req: AuthRequest, res: Response, next: NextFunction) => {
   });
 });
 
-router.put('/', authenticateJWT, requirePermission('settings:write'), updateSettings);
+router.put('/', authenticateJWT, requireActiveSubscription, requirePermission('settings:write'), updateSettings);
 
 export default router;

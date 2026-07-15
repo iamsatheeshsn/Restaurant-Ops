@@ -61,6 +61,8 @@ export interface AdminNavItem {
   icon: LucideIcon;
   roles: AppRole[];
   permissions?: string[];
+  /** SaaS plan feature flag key (from PlanFeatureFlag). Omit = always available. */
+  feature?: string;
 }
 
 export interface AdminNavGroup {
@@ -128,6 +130,7 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
         path: '/admin/finance',
         icon: Wallet,
         roles: [OWNER, AREA_MANAGER, BRANCH_MANAGER, ACCOUNTANT],
+        feature: 'advanced_reports',
       },
       {
         name: 'Approvals',
@@ -204,12 +207,14 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
           DELIVERY_MANAGER,
           DELIVERY_STAFF,
         ],
+        feature: 'kds',
       },
       {
         name: 'Cash Drawer',
         path: '/admin/cash',
         icon: Banknote,
         roles: [OWNER, BRANCH_MANAGER, CASHIER],
+        feature: 'pos',
       },
       {
         name: 'Reservations & CRM',
@@ -222,12 +227,14 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
         path: '/admin/delivery',
         icon: Truck,
         roles: [OWNER, AREA_MANAGER, BRANCH_MANAGER, DELIVERY_MANAGER, DELIVERY_STAFF],
+        feature: 'delivery',
       },
       {
         name: 'Catering & Production',
         path: '/admin/enterprise',
         icon: ChefHat,
         roles: [OWNER, AREA_MANAGER, BRANCH_MANAGER, KITCHEN_MANAGER],
+        feature: 'catering',
       },
     ],
   },
@@ -252,12 +259,14 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
           INVENTORY_MANAGER,
           PURCHASE_MANAGER,
         ],
+        feature: 'inventory',
       },
       {
         name: 'Stock Transfers',
         path: '/admin/transfers',
         icon: ArrowLeftRight,
         roles: [OWNER, AREA_MANAGER, BRANCH_MANAGER, INVENTORY_MANAGER, KITCHEN_MANAGER],
+        feature: 'inventory',
       },
       {
         name: 'Waste Tracker',
@@ -272,6 +281,7 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
           SOUS_CHEF,
           INVENTORY_MANAGER,
         ],
+        feature: 'inventory',
       },
     ],
   },
@@ -301,6 +311,7 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
         path: '/admin/marketing',
         icon: Megaphone,
         roles: [OWNER, MARKETING_MANAGER],
+        feature: 'loyalty',
       },
     ],
   },
@@ -318,6 +329,7 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
         path: '/admin/org-audit',
         icon: ScrollText,
         roles: [OWNER, SYSTEM_AUDITOR],
+        feature: 'advanced_reports',
       },
     ],
   },
@@ -329,6 +341,7 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
         path: '/admin/franchise',
         icon: Landmark,
         roles: [OWNER, AREA_MANAGER],
+        feature: 'multi_branch',
       },
       {
         name: 'Master References',
@@ -352,27 +365,52 @@ export const ADMIN_MENU_GROUPS: AdminNavGroup[] = [
   },
 ];
 
+export const ADMIN_ROUTE_FEATURES: Record<string, string | undefined> = Object.fromEntries(
+  ADMIN_MENU_GROUPS.flatMap((group) => group.items.map((item) => [item.path, item.feature]))
+);
+
 export const ADMIN_ROUTE_ROLES: Record<string, AppRole[]> = Object.fromEntries(
   ADMIN_MENU_GROUPS.flatMap((group) => group.items.map((item) => [item.path, item.roles]))
 ) as Record<string, AppRole[]>;
 
-export function getAllowedAdminRoutes(role: string): string[] {
+export function getAllowedAdminRoutes(role: string, features?: string[] | null): string[] {
+  const featureSet = features ? new Set(features) : null;
   return Object.entries(ADMIN_ROUTE_ROLES)
-    .filter(([, roles]) => roles.includes(role as AppRole))
+    .filter(([path, roles]) => {
+      if (!roles.includes(role as AppRole)) return false;
+      if (role === ROLES.SUPER_ADMIN) return true;
+      const feature = ADMIN_ROUTE_FEATURES[path];
+      if (!feature) return true;
+      // If entitlements not loaded yet, keep item visible; API still enforces.
+      if (!featureSet) return true;
+      return featureSet.has(feature);
+    })
     .map(([path]) => path);
 }
 
-export function canAccessAdminRoute(role: string | undefined, path: string): boolean {
+export function canAccessAdminRoute(
+  role: string | undefined,
+  path: string,
+  features?: string[] | null
+): boolean {
   if (!role) return false;
+  if (role === ROLES.SUPER_ADMIN) {
+    const allowed = ADMIN_ROUTE_ROLES[path];
+    return !!allowed?.includes(role as AppRole);
+  }
   const allowed = ADMIN_ROUTE_ROLES[path];
   if (!allowed) return false;
-  return allowed.includes(role as AppRole);
+  if (!allowed.includes(role as AppRole)) return false;
+  const feature = ADMIN_ROUTE_FEATURES[path];
+  if (!feature) return true;
+  if (!features) return true;
+  return features.includes(feature);
 }
 
 /** All admin panel logins land on the Dashboard (/admin). */
-export function getDefaultAdminPath(role: string): string {
-  if (canAccessAdminRoute(role, '/admin')) return '/admin';
-  const routes = getAllowedAdminRoutes(role);
+export function getDefaultAdminPath(role: string, features?: string[] | null): string {
+  if (canAccessAdminRoute(role, '/admin', features)) return '/admin';
+  const routes = getAllowedAdminRoutes(role, features);
   return routes[0] || '/admin/login';
 }
 

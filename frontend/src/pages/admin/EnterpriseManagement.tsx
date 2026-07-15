@@ -36,7 +36,7 @@ interface Branch {
 }
 
 export const EnterpriseManagement: React.FC = () => {
-  const { showNotification } = useNotification();
+  const { showNotification, showConfirm } = useNotification();
   const [loading, setLoading] = useState(true);
 
   // Active view tab: EVENTS, MANUFACTURING
@@ -97,40 +97,44 @@ export const EnterpriseManagement: React.FC = () => {
     loadData();
   }, []);
 
-  const handleUpdateEventStatus = async (id: string, status: string) => {
-    try {
-      await api.phase3.updateEventStatus(id, status);
-      showNotification({
-        title: 'Event Updated',
-        message: `Catering event marked as ${status}.`,
-        type: 'success'
-      });
-      loadData();
-    } catch (error) {
-      showNotification({
-        title: 'Action Failed',
-        message: 'Could not sync event booking status.',
-        type: 'error'
-      });
-    }
+  const handleUpdateEventStatus = (id: string, status: string) => {
+    showConfirm(`Mark this catering event as ${status}?`, async () => {
+      try {
+        await api.phase3.updateEventStatus(id, status);
+        showNotification({
+          title: 'Event Updated',
+          message: `Catering event marked as ${status}.`,
+          type: 'success'
+        });
+        loadData();
+      } catch (error) {
+        showNotification({
+          title: 'Action Failed',
+          message: 'Could not sync event booking status.',
+          type: 'error'
+        });
+      }
+    }, 'Update event');
   };
 
-  const handleUpdateBatchStatus = async (id: string, status: string) => {
-    try {
-      await api.phase3.updateProductionStatus(id, status);
-      showNotification({
-        title: 'Batch Updated',
-        message: `Central Kitchen batch marked as ${status}.`,
-        type: 'success'
-      });
-      loadData();
-    } catch (error) {
-      showNotification({
-        title: 'Action Failed',
-        message: 'Could not update manufacturing batch.',
-        type: 'error'
-      });
-    }
+  const handleUpdateBatchStatus = (id: string, status: string) => {
+    showConfirm(`Mark this production batch as ${status.replace('_', ' ')}?`, async () => {
+      try {
+        await api.phase3.updateProductionStatus(id, status);
+        showNotification({
+          title: 'Batch Updated',
+          message: `Central Kitchen batch marked as ${status}.`,
+          type: 'success'
+        });
+        loadData();
+      } catch (error) {
+        showNotification({
+          title: 'Action Failed',
+          message: 'Could not update manufacturing batch.',
+          type: 'error'
+        });
+      }
+    }, 'Update batch');
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {

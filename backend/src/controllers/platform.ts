@@ -14,6 +14,7 @@ import {
   TicketStatus,
   IntegrationChannel,
 } from '@prisma/client';
+import { resolvePlanTier, createTenantSubscription } from '../services/subscription';
 
 const startedAt = Date.now();
 
@@ -45,15 +46,19 @@ export const listTenants = async (req: AuthRequest, res: Response, next: NextFun
 
 export const createTenant = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { name, companyName, status, slug: rawSlug, currency, timezone } = req.body;
+    const { name, companyName, status, slug: rawSlug, currency, timezone, planId, planTier } = req.body;
     if (!name || !companyName) {
       return next(new AppError('name and companyName are required', 400, 'VALIDATION_ERROR'));
     }
+
+    const plan = await resolvePlanTier({ planId, planTier });
 
     const slug = await uniqueTenantSlug(rawSlug || name, async (s) => {
       const hit = await prisma.tenant.findFirst({ where: { slug: s } });
       return !!hit;
     });
+
+    const tenantStatus = (status as TenantStatus) || TenantStatus.TRIAL;
 
     const tenant = await prisma.$transaction(async (tx) => {
       const created = await tx.tenant.create({
@@ -61,7 +66,7 @@ export const createTenant = async (req: AuthRequest, res: Response, next: NextFu
           name,
           companyName,
           slug,
-          status: (status as TenantStatus) || TenantStatus.TRIAL,
+          status: tenantStatus,
         },
       });
 
@@ -82,10 +87,81 @@ export const createTenant = async (req: AuthRequest, res: Response, next: NextFu
         },
       });
 
+      await createTenantSubscription(tx, {
+        tenantId: created.id,
+        tier: plan.tier,
+        maxBranches: plan.maxBranches,
+        maxEmployees: plan.maxEmployees,
+        tenantStatus,
+      });
+
       return created;
     });
 
-    return res.status(201).json({ success: true, data: tenant });
+    const withSub = await prisma.tenant.findUnique({
+      where: { id: tenant.id },
+      include: {
+        settings: true,
+        subscriptions: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+    });
+
+    return res.status(201).json({ success: true, data: withSub });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Assign or change the active subscription plan for a tenant. */
+export const assignTenantPlan = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { planId, planTier, status } = req.body;
+    const plan = await resolvePlanTier({ planId, planTier });
+
+    const tenant = await prisma.tenant.findFirst({ where: { id, deletedAt: null } });
+    if (!tenant) return next(new AppError('Tenant not found', 404, 'RESOURCE_NOT_FOUND'));
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    const existing = await prisma.subscription.findFirst({
+      where: { tenantId: id, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let subscription;
+    if (existing) {
+      subscription = await prisma.subscription.update({
+        where: { id: existing.id },
+        data: {
+          planTier: plan.tier,
+          maxBranches: plan.maxBranches,
+          maxEmployees: plan.maxEmployees,
+          status: status || (tenant.status === TenantStatus.TRIAL ? 'TRIALING' : 'ACTIVE'),
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          deletedAt: null,
+        },
+      });
+    } else {
+      subscription = await createTenantSubscription(prisma, {
+        tenantId: id,
+        tier: plan.tier,
+        maxBranches: plan.maxBranches,
+        maxEmployees: plan.maxEmployees,
+        tenantStatus: tenant.status,
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        ...subscription,
+        planName: plan.planName,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -334,15 +410,27 @@ export const updateInvoiceStatus = async (req: AuthRequest, res: Response, next:
     const { status, paidAt } = req.body;
     if (!status) return next(new AppError('status is required', 400, 'VALIDATION_ERROR'));
 
+    const normalized = String(status).toUpperCase();
+    const allowed = ['DRAFT', 'OPEN', 'SENT', 'PAID', 'OVERDUE', 'VOID'];
+    if (!allowed.includes(normalized)) {
+      return next(new AppError(`status must be one of: ${allowed.join(', ')}`, 400, 'VALIDATION_ERROR'));
+    }
+
     const invoice = await prisma.invoice.findUnique({ where: { id } });
     if (!invoice) return next(new AppError('Invoice not found', 404, 'RESOURCE_NOT_FOUND'));
 
     const updated = await prisma.invoice.update({
       where: { id },
       data: {
-        status,
-        paidAt: paidAt ? new Date(paidAt) : status === 'PAID' ? new Date() : invoice.paidAt,
+        status: normalized === 'SENT' ? 'OPEN' : normalized,
+        paidAt:
+          normalized === 'PAID'
+            ? paidAt
+              ? new Date(paidAt)
+              : new Date()
+            : null,
       },
+      include: { tenant: { select: { id: true, name: true, companyName: true } } },
     });
     return res.json({ success: true, data: updated });
   } catch (error) {

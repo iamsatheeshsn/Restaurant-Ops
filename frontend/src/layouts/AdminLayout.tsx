@@ -168,9 +168,14 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
 
           <nav className="p-4 space-y-6 overflow-y-auto">
             {menuGroups.map((group) => {
-              const allowedItems = group.items.filter(
-                (item) => !user || item.roles.includes(user.role as any)
-              );
+              const allowedItems = group.items.filter((item) => {
+                if (user && !item.roles.includes(user.role as any)) return false;
+                if (!item.feature || !user) return true;
+                if (user.role === 'SUPER_ADMIN') return true;
+                const features = user.subscription?.features;
+                if (!features) return true;
+                return features.includes(item.feature);
+              });
 
               if (allowedItems.length === 0) return null;
 

@@ -4,7 +4,7 @@ import { ResourceModule } from '../../components/ResourceModule';
 import { useNotification } from '../../context/NotificationContext';
 
 export const ExpensesManagement: React.FC = () => {
-  const { showNotification } = useNotification();
+  const { showNotification, showConfirm } = useNotification();
 
   return (
     <ResourceModule
@@ -33,19 +33,23 @@ export const ExpensesManagement: React.FC = () => {
           <div className="flex gap-2">
             <button
               className="text-emerald-400 hover:underline"
-              onClick={async () => {
-                await api.ops.expenses.approve(row.id);
-                showNotification({ title: 'Approved', message: 'Expense approved', type: 'success' });
-                reload();
+              onClick={() => {
+                showConfirm('Approve this expense?', async () => {
+                  await api.ops.expenses.approve(row.id);
+                  showNotification({ title: 'Approved', message: 'Expense approved', type: 'success' });
+                  reload();
+                }, 'Approve expense');
               }}
             >
               Approve
             </button>
             <button
               className="text-red-400 hover:underline"
-              onClick={async () => {
-                await api.ops.expenses.reject(row.id);
-                reload();
+              onClick={() => {
+                showConfirm('Reject this expense?', async () => {
+                  await api.ops.expenses.reject(row.id);
+                  reload();
+                }, 'Reject expense');
               }}
             >
               Reject

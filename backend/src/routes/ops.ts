@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateJWT, requirePermission, requireAnyPermission } from '../middleware/auth';
+import { authenticateJWT, requirePermission, requireAnyPermission, requireFeature, requireActiveSubscription } from '../middleware/auth';
 import {
   listExpenses,
   createExpense,
@@ -32,7 +32,7 @@ import {
 
 const router = Router();
 
-router.use(authenticateJWT);
+router.use(authenticateJWT, requireActiveSubscription);
 
 // Expenses
 router.get('/expenses', requirePermission('finance:read'), listExpenses);
@@ -54,19 +54,19 @@ router.post('/leaves', requirePermission('staff:manage'), createLeave);
 router.patch('/leaves/:id/status', requirePermission('staff:manage'), updateLeaveStatus);
 
 // Delivery jobs
-router.get('/delivery-jobs', requirePermission('delivery:manage'), listDeliveryJobs);
-router.post('/delivery-jobs', requirePermission('delivery:manage'), createDeliveryJob);
-router.patch('/delivery-jobs/:id/status', requirePermission('delivery:manage'), updateDeliveryJobStatus);
+router.get('/delivery-jobs', requirePermission('delivery:manage'), requireFeature('delivery'), listDeliveryJobs);
+router.post('/delivery-jobs', requirePermission('delivery:manage'), requireFeature('delivery'), createDeliveryJob);
+router.patch('/delivery-jobs/:id/status', requirePermission('delivery:manage'), requireFeature('delivery'), updateDeliveryJobStatus);
 
 // Marketing campaigns
-router.get('/campaigns', requirePermission('loyalty:manage'), listCampaigns);
-router.post('/campaigns', requirePermission('loyalty:manage'), createCampaign);
-router.put('/campaigns/:id', requirePermission('loyalty:manage'), updateCampaign);
+router.get('/campaigns', requirePermission('loyalty:manage'), requireFeature('loyalty'), listCampaigns);
+router.post('/campaigns', requirePermission('loyalty:manage'), requireFeature('loyalty'), createCampaign);
+router.put('/campaigns/:id', requirePermission('loyalty:manage'), requireFeature('loyalty'), updateCampaign);
 
 // Stock transfers
-router.get('/transfers', requirePermission('inventory:write'), listStockTransfers);
-router.post('/transfers', requirePermission('inventory:write'), createStockTransfer);
-router.patch('/transfers/:id/status', requirePermission('inventory:write'), updateStockTransferStatus);
+router.get('/transfers', requirePermission('inventory:write'), requireFeature('inventory'), listStockTransfers);
+router.post('/transfers', requirePermission('inventory:write'), requireFeature('inventory'), createStockTransfer);
+router.patch('/transfers/:id/status', requirePermission('inventory:write'), requireFeature('inventory'), updateStockTransferStatus);
 
 // Approvals
 router.get('/approvals', requirePermission('reports:read'), listApprovals);
@@ -78,7 +78,7 @@ router.post(
 );
 
 // Finance summary
-router.get('/finance/summary', requirePermission('finance:read'), financeSummary);
+router.get('/finance/summary', requirePermission('finance:read'), requireFeature('advanced_reports'), financeSummary);
 
 // Tenant-scoped audit logs
 router.get('/audit-logs', requirePermission('audit:read'), listTenantAuditLogs);

@@ -144,7 +144,12 @@ export const api = {
         headers: getHeaders(),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message || json.error || 'Failed to fetch user session');
+      if (!res.ok) {
+        const err: any = new Error(json.error?.message || json.error || 'Failed to fetch user session');
+        err.status = res.status;
+        err.code = json.error?.code;
+        throw err;
+      }
       return json.data;
     },
   },
@@ -979,6 +984,16 @@ export const api = {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error?.message || 'Failed to update tenant');
+        return json.data;
+      },
+      assignPlan: async (id: string, data: { planId?: string; planTier?: string; status?: string }) => {
+        const res = await fetch(`${API_URL}/platform/tenants/${id}/plan`, {
+          method: 'PATCH',
+          headers: getHeaders(),
+          body: JSON.stringify(data),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error?.message || 'Failed to assign plan');
         return json.data;
       },
       remove: async (id: string) => {
